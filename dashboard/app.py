@@ -23,6 +23,17 @@ state_customer = pd.read_csv(DATA_DIR / "state_customer_summary.csv")
 category_summary = pd.read_csv(DATA_DIR / "category_summary.csv")
 delay_band_summary = pd.read_csv(DATA_DIR / "delay_band_summary.csv")
 monthly_trend = pd.read_csv(DATA_DIR / "monthly_trend.csv", parse_dates=["purchase_month"])
+seller_quality = pd.read_csv(DATA_DIR / "seller_quality.csv")
+category_quality = pd.read_csv(DATA_DIR / "category_quality.csv")
+customer_quadrant_summary = pd.read_csv(DATA_DIR / "customer_quadrant_summary.csv")
+customer_delay_repeat_summary = pd.read_csv(DATA_DIR / "customer_delay_repeat_summary.csv")
+customer_repeat_overview = pd.read_csv(DATA_DIR / "customer_repeat_overview.csv").iloc[0]
+funnel_origin_conversion = pd.read_csv(DATA_DIR / "funnel_origin_conversion.csv")
+funnel_business_type_share = pd.read_csv(DATA_DIR / "funnel_business_type_share.csv")
+funnel_overview = pd.read_csv(DATA_DIR / "funnel_overview.csv").iloc[0]
+
+QUADRANT_ORDER = ["High-value & happy", "Low-value & happy", "High-value & unhappy", "Low-value & unhappy"]
+DELAY_REPEAT_ORDER = ["0% late", "1-33% late", "34-66% late", "67-100% late"]
 
 DELAY_BAND_ORDER = ["On or before estimate", "1-3 days late", "4-7 days late", "8+ days late"]
 STATES = sorted(state_seller["state"].unique())
@@ -36,7 +47,7 @@ CARD_STYLE = {
 }
 SECTION_STYLE = {"background": "#f5f6f8", "padding": "24px", "minHeight": "100vh"}
 
-app = Dash(__name__, title="Marketplace Dashboard")
+app = Dash(__name__, title="Marketplace Dashboard", suppress_callback_exceptions=True)
 server = app.server  # for deployment (gunicorn/render/etc.)
 
 
@@ -109,14 +120,10 @@ app.layout = html.Div([
         dcc.Tab(label="By Seller", value="tab-seller"),
         dcc.Tab(label="By Region", value="tab-region"),
         dcc.Tab(label="Delivery Performance", value="tab-delivery"),
+        dcc.Tab(label="Customer Retention", value="tab-retention"),
+        dcc.Tab(label="Seller Acquisition", value="tab-funnel"),
     ]),
     html.Div(id="tab-content", style={"marginTop": "18px"}),
-
-    html.Div(
-        "Data: cleaned master tables (orders, sellers, customers, categories, marketing funnel) - "
-        "E-Commerce Visual Analytics, Data Visualization Design, IIT Madras.",
-        style={"color": "#999", "fontSize": "11px", "marginTop": "30px", "textAlign": "center"},
-    ),
 ], style=SECTION_STYLE)
 
 
@@ -238,6 +245,52 @@ def render_tab(tab):
             ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}),
         ])
 
+    if tab == "tab-retention":
+        return html.Div([
+            html.Div(
+                f"Only {customer_repeat_overview['repeat_rate']:.1%} of "
+                f"{int(customer_repeat_overview['total_customers']):,} customers ever place a second "
+                f"order. The charts below size exactly who is unhappy, how much revenue they "
+                f"represent, and why.",
+                style={"color": "#666", "fontSize": "13px", "marginBottom": "12px"},
+            ),
+            html.Div([
+                html.Div([
+                    html.H4("Who stands out? Value × satisfaction quadrant"),
+                    dcc.Graph(id="quadrant-chart"),
+                ], style={**CARD_STYLE, "flex": "1"}),
+                html.Div([
+                    html.H4("Review score & repeat rate by delivery-delay band"),
+                    dcc.Graph(id="delay-repeat-chart"),
+                ], style={**CARD_STYLE, "flex": "1"}),
+            ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}),
+            html.Div([
+                html.H4("Selected segment detail"),
+                html.Div(id="quadrant-detail"),
+            ], style={**CARD_STYLE, "marginTop": "16px"}),
+        ])
+
+    if tab == "tab-funnel":
+        return html.Div([
+            html.Div(
+                f"{funnel_overview['conversion_rate']:.1%} of "
+                f"{int(funnel_overview['total_leads']):,} marketing-qualified leads convert into an "
+                f"active seller ({int(funnel_overview['converted_leads']):,} sellers). Volume and "
+                f"conversion quality are not the same channel.",
+                style={"color": "#666", "fontSize": "13px", "marginBottom": "12px"},
+            ),
+            html.Div([
+                html.Div([
+                    html.H4("Conversion rate by acquisition channel"),
+                    dcc.Graph(id="funnel-origin-chart"),
+                ], style={**CARD_STYLE, "flex": "1"}),
+                html.Div([
+                    html.H4("Business type mix among converted sellers"),
+                    dcc.Graph(id="funnel-business-chart"),
+                ], style={**CARD_STYLE, "flex": "1"}),
+            ], style={"display": "flex", "gap": "16px", "flexWrap": "wrap"}),
+        ])
+
     return html.Div()
 
 
@@ -281,6 +334,12 @@ def category_detail(click_data):
         return empty_state_note("Click a bar in the left chart to see why that category stands out.")
     cat_name = click_data["points"][0]["y"]
     row = category_summary[category_summary["product_category"] == cat_name].iloc[0]
+    quality_text = (
+        f" Product-quality-issue rate: {row['quality_issue_rate']:.1f}% "
+        f"(from review-text mining, {int(row['quality_eval_orders']):,} orders evaluated)."
+        if row.get("has_quality_data") else
+        " Not enough order volume (<500) to report a reliable product-quality-issue rate."
+    )
     return html.Div([
         html.H5(cat_name.replace("_", " ").title()),
         html.P([
@@ -289,6 +348,7 @@ def category_detail(click_data):
             f"Average review score {row['avg_review_score']:.2f}/5 over {row['review_count']:,} reviews. ",
             f"Late-delivery rate {row['late_delivery_rate']:.1%}, "
             f"{row['review_risk_rate']:.1%} of this category's orders are review-risk flagged.",
+            quality_text,
         ]),
     ])
 
@@ -339,15 +399,19 @@ def seller_table(state, tier, risk):
     if df.empty:
         return empty_state_note("No sellers match the current filters.")
     cols = ["seller_id", "seller_state", "total_item_sales_value", "avg_review_score",
-            "late_delivery_rate", "review_risk_flag"]
+            "late_delivery_rate", "review_risk_flag", "quality_issue_rate"]
     top = df.nlargest(5, "total_item_sales_value")[cols]
     risky = df[df["review_risk_flag"]].nlargest(5, "total_item_sales_value")[cols]
+
+    def fmt_quality(v):
+        return f"{v:.1f}%" if pd.notna(v) else "n/a"
 
     def to_table(sub_df, title):
         return html.Div([
             html.Div(title, style={"fontWeight": "600", "marginBottom": "6px"}),
             html.Table([
-                html.Thead(html.Tr([html.Th(c) for c in ["Seller", "State", "Sales (R$)", "Review", "Late %", "At risk"]])),
+                html.Thead(html.Tr([html.Th(c) for c in
+                    ["Seller", "State", "Sales (R$)", "Review", "Late %", "At risk", "Quality-issue %"]])),
                 html.Tbody([
                     html.Tr([
                         html.Td(r.seller_id[:10] + "..."), html.Td(r.seller_state),
@@ -355,6 +419,7 @@ def seller_table(state, tier, risk):
                         html.Td(f"{r.avg_review_score:.2f}" if pd.notna(r.avg_review_score) else "n/a"),
                         html.Td(f"{r.late_delivery_rate:.1%}"),
                         html.Td("Yes" if r.review_risk_flag else "No"),
+                        html.Td(fmt_quality(r.quality_issue_rate)),
                     ]) for r in sub_df.itertuples()
                 ]),
             ], style={"width": "100%", "fontSize": "12px", "borderCollapse": "collapse"}),
@@ -439,6 +504,101 @@ def monthly_trend_chart(_):
         yaxis2=dict(title="Late-delivery rate (%)", overlaying="y", side="right"),
         legend=dict(orientation="h", y=-0.15),
     )
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Customer Retention tab callbacks
+# ---------------------------------------------------------------------------
+@app.callback(Output("quadrant-chart", "figure"), Input("tabs", "value"))
+def quadrant_chart(_):
+    df = customer_quadrant_summary.set_index("segment").reindex(QUADRANT_ORDER).reset_index()
+    colors = [PALETTE["green"] if "happy" in s else PALETTE["red"] for s in df["segment"]]
+    fig = go.Figure(go.Bar(
+        x=df["revenue_share_pct"], y=df["segment"], orientation="h", marker_color=colors,
+        customdata=df[["customers", "late_delivery_rate"]],
+        hovertemplate="%{y}<br>Revenue share: %{x:.1f}%<br>Customers: %{customdata[0]:,}"
+                      "<br>Late-delivery rate: %{customdata[1]:.1%}<extra></extra>",
+        text=df["revenue_share_pct"].apply(lambda v: f"{v:.1f}%"), textposition="outside",
+    ))
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=380,
+                       xaxis_title="Share of total revenue (%)", yaxis_title="")
+    return fig
+
+
+@app.callback(Output("delay-repeat-chart", "figure"), Input("tabs", "value"))
+def delay_repeat_chart(_):
+    df = customer_delay_repeat_summary.set_index("late_band").reindex(DELAY_REPEAT_ORDER).reset_index()
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=df["late_band"], y=df["avg_review_score"], name="Avg review score",
+                          marker_color=PALETTE["blue"], yaxis="y1"))
+    fig.add_trace(go.Scatter(x=df["late_band"], y=df["repeat_rate"] * 100, name="Repeat rate (%)",
+                              marker_color=PALETTE["red"], yaxis="y2", mode="lines+markers"))
+    fig.update_layout(
+        margin=dict(l=10, r=10, t=10, b=10), height=380,
+        yaxis=dict(title="Avg review score", range=[0, 5.3]),
+        yaxis2=dict(title="Repeat rate (%)", overlaying="y", side="right"),
+        legend=dict(orientation="h", y=-0.2),
+    )
+    return fig
+
+
+@app.callback(Output("quadrant-detail", "children"), Input("quadrant-chart", "clickData"))
+def quadrant_detail(click_data):
+    notes = {
+        "High-value & unhappy": (
+            "This is the single highest-leverage group: real revenue at stake, and a "
+            "late-delivery rate roughly 8-9x higher than equally valuable, satisfied customers. "
+            "Fixing delivery for this segment protects revenue without a platform-wide overhaul."
+        ),
+        "High-value & happy": "The core of the business - high spend, low late-delivery rate. Protect this segment's experience, don't disrupt it.",
+        "Low-value & happy": "Largest segment by headcount and a healthy delivery experience - a natural pool to grow into higher-value customers.",
+        "Low-value & unhappy": "Smaller revenue exposure than the high-value-unhappy group, but the highest late-delivery rate of all four segments.",
+    }
+    if not click_data:
+        seg = "High-value & unhappy"
+    else:
+        seg = click_data["points"][0]["y"]
+    row = customer_quadrant_summary[customer_quadrant_summary["segment"] == seg].iloc[0]
+    return html.Div([
+        html.H5(seg),
+        html.P(
+            f"{row['customers']:,} customers, {row['revenue_share_pct']:.1f}% of total revenue, "
+            f"avg review score {row['avg_review_score']:.2f}/5, "
+            f"late-delivery rate {row['late_delivery_rate']:.1%}. {notes.get(seg, '')}"
+        ),
+    ])
+
+
+# ---------------------------------------------------------------------------
+# Seller Acquisition (funnel) tab callbacks
+# ---------------------------------------------------------------------------
+@app.callback(Output("funnel-origin-chart", "figure"), Input("tabs", "value"))
+def funnel_origin_chart(_):
+    df = funnel_origin_conversion.sort_values("conversion_rate")
+    fig = go.Figure(go.Bar(
+        x=df["conversion_rate"] * 100, y=df["origin"], orientation="h", marker_color=PALETTE["blue"],
+        customdata=df[["leads"]],
+        hovertemplate="%{y}<br>Conversion rate: %{x:.1f}%<br>Leads: %{customdata[0]:,}<extra></extra>",
+        text=df.apply(lambda r: f"{r['conversion_rate']*100:.1f}% (n={r['leads']:,})", axis=1),
+        textposition="outside",
+    ))
+    fig.add_vline(x=funnel_overview["conversion_rate"] * 100, line_dash="dash", line_color=PALETTE["red"],
+                  annotation_text="Overall avg")
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420,
+                       xaxis_title="Conversion rate (%)", yaxis_title="")
+    return fig
+
+
+@app.callback(Output("funnel-business-chart", "figure"), Input("tabs", "value"))
+def funnel_business_chart(_):
+    df = funnel_business_type_share.sort_values("share_pct", ascending=False)
+    fig = go.Figure(go.Bar(
+        x=df["business_type"], y=df["share_pct"], marker_color=PALETTE["green"],
+        text=df["share_pct"].apply(lambda v: f"{v:.1f}%"), textposition="outside",
+    ))
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420,
+                       yaxis_title="Share of converted leads (%)", xaxis_title="")
     return fig
 
 
