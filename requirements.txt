@@ -1,0 +1,8 @@
+numpy
+pandas
+plotly
+dash
+dash_ag_grid
+seaborn
+scipy
+statsmodels
