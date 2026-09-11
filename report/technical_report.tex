@@ -15,6 +15,7 @@
 \usepackage{titlesec}
 \usepackage{caption}
 \usepackage{amsmath}
+\usepackage{xurl}
 
 \hypersetup{
     colorlinks=true,
@@ -151,97 +152,97 @@ tables used in the analysis. Full detail and code are in the corresponding clean
 (see Appendix~A for links).
 
 \section{Master Order Table}
-\textbf{Cleaning notebook:} \texttt{data\_cleaning/cleaning\_master\_order\_table.ipynb}
+\textbf{Cleaning notebook:} \path{data_cleaning/cleaning_master_order_table.ipynb}
 
 Raw order, customer, and review data were joined into a single order-level table. Two small
 null-handling decisions were made explicitly rather than silently:
 \begin{itemize}
-    \item \texttt{order\_approved\_at} (14 nulls) and \texttt{order\_delivered\_carrier\_date}
+    \item \path{order_approved_at} (14 nulls) and \path{order_delivered_carrier_date}
         (1 null) were imputed using the median approval delay, since the gap between adjacent
         timestamp columns is small and stable enough for a median-based fill to be defensible.
-    \item Rows with no \texttt{review\_score} were dropped rather than imputed, since a review
+    \item Rows with no \path{review_score} were dropped rather than imputed, since a review
         score cannot be meaningfully guessed from other columns without fabricating signal.
-    \item Orders that never reached the customer (no \texttt{order\_delivered\_customer\_date})
-        had \texttt{actual\_delivery\_days} and \texttt{delivery\_delay\_days} left null and
+    \item Orders that never reached the customer (no \path{order_delivered_customer_date})
+        had \path{actual_delivery_days} and \path{delivery_delay_days} left null and
         excluded from delivery-timing statistics, rather than being backfilled with a guessed
         delivery date.
 \end{itemize}
 
-Engineered columns include \texttt{approval\_delay\_days}, \texttt{shipping\_prep\_days},
-\texttt{transit\_days}, \texttt{total\_delivery\_days}, \texttt{delivery\_vs\_estimate\_days},
-\texttt{late\_delivery\_flag}, and calendar features (\texttt{purchase\_year},
-\texttt{purchase\_month}, \texttt{purchase\_dow}, \texttt{purchase\_hour}). Outliers in numeric
+Engineered columns include \path{approval_delay_days}, \path{shipping_prep_days},
+\path{transit_days}, \path{total_delivery_days}, \path{delivery_vs_estimate_days},
+\path{late_delivery_flag}, and calendar features (\path{purchase_year},
+\path{purchase_month}, \path{purchase_dow}, \path{purchase_hour}). Outliers in numeric
 columns were identified via the IQR method and capped (not dropped) into separate
-\texttt{\_capped} columns, preserving the original values so that outlier sensitivity could be
+\path{_capped} columns, preserving the original values so that outlier sensitivity could be
 checked rather than assumed away. The cleaned table was ultimately split into two
-sub-tables -- \texttt{cleaned\_master\_order\_table1.csv} (customer/order/review identity fields)
-and \texttt{cleaned\_master\_order\_table2.csv} (order-economics fields: freight, item count,
+sub-tables -- \path{cleaned_master_order_table1.csv} (customer/order/review identity fields)
+and \path{cleaned_master_order_table2.csv} (order-economics fields: freight, item count,
 seller count) -- to keep each table focused.
 
 \section{Customer-Level Master Table}
-\textbf{Notebook:} \texttt{data-visualization/customer-master-analysis.ipynb}
+\textbf{Notebook:} \path{data-visualization/customer-master-analysis.ipynb}
 
-Built by aggregating the order table to one row per \texttt{customer\_unique\_id}: total orders,
+Built by aggregating the order table to one row per \path{customer_unique_id}: total orders,
 total/average payment value, average review score, late-delivery rate, product/seller diversity,
-and a \texttt{repeat\_customer\_flag}. A known limitation, explicitly documented rather than
+and a \path{repeat_customer_flag}. A known limitation, explicitly documented rather than
 hidden, is that this table aggregates each customer's \emph{entire observed history} into one row,
 so the \textasciitilde3.1\% repeat rate should be read as a lower bound partly shaped by the
 observation window (customers who joined near the end of the window have had less time to
 re-order), not purely by product or service quality.
 
 \section{Seller-Level Master Table}
-\textbf{Cleaning notebook:} \texttt{data\_cleaning/clean\_seller\_master\_table.ipynb}
+\textbf{Cleaning notebook:} \path{data_cleaning/clean_seller_master_table.ipynb}
 
 One row per seller (3{,}095 rows, 28 raw columns), aggregating order volume, sales value, delivery
-performance, and review behavior. The key missing-value decision: \texttt{avg\_review\_score} is
-missing exactly when \texttt{review\_count} is 0 (a seller with no reviews yet). Rather than
-imputing a fabricated score, the row is kept and a \texttt{has\_reviews} flag is added, so
+performance, and review behavior. The key missing-value decision: \path{avg_review_score} is
+missing exactly when \path{review_count} is 0 (a seller with no reviews yet). Rather than
+imputing a fabricated score, the row is kept and a \path{has_reviews} flag is added, so
 downstream analyses can exclude unreviewed sellers cleanly instead of treating a missing score as
 a zero. A data-quality issue was also identified and flagged rather than silently used:
-\texttt{active\_seller\_flag} is \texttt{True} for 100\% of rows and currently carries no
+\path{active_seller_flag} is \path{True} for 100\% of rows and currently carries no
 discriminating information -- it should not be used for any ``active vs.\ inactive'' filtering
 until fixed upstream.
 
 \section{Category-Level Master Table}
-\textbf{Cleaning notebook:} \texttt{data\_cleaning/clean\_category\_master\_table.ipynb}
+\textbf{Cleaning notebook:} \path{data_cleaning/clean_category_master_table.ipynb}
 
 Built by joining order items to products and translating category names to English, then rolling
 up to 73 categories with sales volume, seller count, and the same satisfaction/delivery metrics
 used elsewhere. Only 610 products (1.9\% of the raw catalog) with no category at all were dropped;
-the 73 surviving categories have complete, non-imputed \texttt{has\_reviews} and
-\texttt{has\_delivery\_data} coverage. Two categories (\texttt{pc\_gamer},
-\texttt{portateis\_cozinha\_e\_preparadores\_de\_alimentos}) have no official English translation
+the 73 surviving categories have complete, non-imputed \path{has_reviews} and
+\path{has_delivery_data} coverage. Two categories (\path{pc_gamer},
+\path{portateis_cozinha_e_preparadores_de_alimentos}) have no official English translation
 and are kept under their Portuguese name -- a labeling quirk only, not a data-quality gap.
 
 \section{Marketing-Funnel Table}
-\textbf{Cleaning notebook:} \texttt{data\_cleaning/clean\_marketing\_funnel\_table.ipynb}
+\textbf{Cleaning notebook:} \path{data_cleaning/clean_marketing_funnel_table.ipynb}
 
-One row per marketing-qualified lead (8{,}000 leads), with \texttt{is\_converted\_flag} set when a
+One row per marketing-qualified lead (8{,}000 leads), with \path{is_converted_flag} set when a
 matching closed deal exists. Two cleaning decisions stand out:
 \begin{itemize}
-    \item \texttt{declared\_monthly\_revenue} and \texttt{declared\_product\_catalog\_size} were
+    \item \path{declared_monthly_revenue} and \path{declared_product_catalog_size} were
         found to be exactly 0 for \textasciitilde95\% of converted deals -- a pattern uniform
         across every lead type, consistent with an unanswered survey field defaulting to 0 rather
-        than a real declared value. These were recoded to \texttt{NaN} with explicit
-        \texttt{has\_declared\_revenue} / \texttt{has\_declared\_catalog\_size} flags, leaving only
+        than a real declared value. These were recoded to \path{NaN} with explicit
+        \path{has_declared_revenue} / \path{has_declared_catalog_size} flags, leaving only
         45 of 842 converted deals (5.3\%) with a usable, non-placeholder revenue figure.
-    \item One converted deal showed a negative \texttt{time\_to\_win\_days} (recorded as won two
+    \item One converted deal showed a negative \path{time_to_win_days} (recorded as won two
         days \emph{before} first contact) -- almost certainly an upstream data-entry error. It was
-        flagged via \texttt{time\_to\_win\_valid\_flag} and excluded from timing statistics rather
+        flagged via \path{time_to_win_valid_flag} and excluded from timing statistics rather
         than silently kept or dropped from the table entirely.
-    \item Deal-side fields (\texttt{business\_segment}, \texttt{lead\_type},
-        \texttt{business\_type}, \texttt{sdr\_id}, \texttt{sr\_id}, \texttt{won\_date}) are
-        \texttt{NaN} precisely when \texttt{is\_converted\_flag} is \texttt{False}, by construction
+    \item Deal-side fields (\path{business_segment}, \path{lead_type},
+        \path{business_type}, \path{sdr_id}, \path{sr_id}, \path{won_date}) are
+        \path{NaN} precisely when \path{is_converted_flag} is \path{False}, by construction
         of the join -- a missing value there means ``never converted,'' not ``dirty data.''
 \end{itemize}
 
 \section{Customer Reviews (Sentiment and Topic Mining)}
-\textbf{Notebook:} \texttt{EDA/review\_message\_analysis.ipynb}
+\textbf{Notebook:} \path{EDA/review_message_analysis.ipynb}
 
 Review titles and messages, originally in Portuguese, were translated to English, combined into a
 single text field, and passed through sentiment classification and topic classification to
 identify recurring complaint themes (delivery delay, product condition/damage, product quality,
-returns/refunds, etc.). This structured output (\texttt{sentiment}, \texttt{primary\_topic}) is the
+returns/refunds, etc.). This structured output (\path{sentiment}, \path{primary_topic}) is the
 join key used throughout Chapter 4 to connect qualitative complaints to quantitative delivery and
 seller/category metrics.
 
@@ -297,7 +298,7 @@ is preserved in the per-table Q\&A documents (Appendix~A).
     \item Sellers are heavily concentrated in S\~ao Paulo (1{,}849 of 3{,}095, 60\%).
     \item Sales are long-tail: the top 10\% of sellers generate 67.5\% of item sales value.
     \item Late-delivery rate correlates with average review score at $-0.42$ across sellers, and
-        with the derived \texttt{review\_risk\_rate} at $+0.40$.
+        with the derived \path{review_risk_rate} at $+0.40$.
     \item Most sellers (97\%) beat their own delivery estimate on average, but a real tail exists:
         230 sellers (7.4\%) have a late-delivery rate above 20\%.
     \item Seller tenure has essentially no relationship with review score ($+0.08$) or late-delivery
@@ -314,7 +315,7 @@ is preserved in the per-table Q\&A documents (Appendix~A).
     \item Category size and category satisfaction are essentially uncorrelated ($\sim$0.01) -- a
         large category is not automatically ``safe,'' and a small one is not automatically
         low-risk.
-    \item \texttt{office\_furniture} stands out as the most important category to act on: it does
+    \item \path{office_furniture} stands out as the most important category to act on: it does
         real volume (1{,}654 reviews, R\$273{,}961 in sales) yet scores meaningfully below the
         marketplace average (3.51 vs.\ \textasciitilde4.08).
     \item At the category-aggregate level, the delivery--satisfaction link is much weaker
@@ -329,12 +330,12 @@ is preserved in the per-table Q\&A documents (Appendix~A).
     \item Overall lead-to-seller conversion is \textasciitilde10.5\% (842 of 8{,}000 leads); this is
         not a ``still warming up'' artifact, since converted and unconverted leads have
         near-identical age distributions.
-    \item Channel volume and channel quality diverge: \texttt{organic\_search} and
-        \texttt{paid\_search} bring the most leads, but \texttt{unknown} (untracked referral) and
-        \texttt{paid\_search} convert best; \texttt{social} and \texttt{email} carry real volume
+    \item Channel volume and channel quality diverge: \path{organic_search} and
+        \path{paid_search} bring the most leads, but \path{unknown} (untracked referral) and
+        \path{paid_search} convert best; \path{social} and \path{email} carry real volume
         (300+ leads each) but convert well below average.
-    \item Converted leads skew \textasciitilde2:1 toward \texttt{reseller} over
-        \texttt{manufacturer} business type, confirming the marketplace's structural role as a
+    \item Converted leads skew \textasciitilde2:1 toward \path{reseller} over
+        \path{manufacturer} business type, confirming the marketplace's structural role as a
         platform for small/medium resellers.
     \item Median time-to-win is about two weeks, with a long right tail past 100+ days for a small
         group of ``stuck'' leads.
@@ -346,7 +347,7 @@ is preserved in the per-table Q\&A documents (Appendix~A).
 \chapter{Explanatory Analysis: The Retention Story}
 % ================================================================
 
-This chapter presents the project's central narrative, built in \texttt{combined\_eda.ipynb}: a
+This chapter presents the project's central narrative, built in \path{combined_eda.ipynb}: a
 single, connected walk from the retention problem, through customer complaints, to specific
 geographic, seller, and category-level causes, back up to a sized customer segment and a set of
 recommendations. Figures are numbered in narrative order; each live (re-executed) chart is
@@ -478,7 +479,7 @@ The current live-recomputed top seller has a \textbf{9.23\%} quality-issue rate 
 
 \caveat{An earlier draft of this analysis cited a top rate of 23.76\% (48 of 202 deliveries) based
 on a stale run of the review-mining pipeline. Re-running the identical join logic against the
-current \texttt{processed\_customer\_reviews.csv} produced the 9.23\% figure reported here. This
+current \path{processed_customer_reviews.csv} produced the 9.23\% figure reported here. This
 table is intentionally kept as a live, re-runnable computation (rather than a static exported
 chart) specifically so it cannot silently drift out of date again.}
 
@@ -489,9 +490,9 @@ product-quality complaints without requiring a marketplace-wide policy change.}
 \section{Product Category Analysis}
 
 Restricting to categories with at least 500 orders (Figure~\ref{fig:quality_categories}),
-\textbf{bed\_bath\_table} has the highest quality-issue rate at \textbf{5.2\%}, followed by
-\textbf{luggage\_accessories} (4.8\%) and \textbf{office\_furniture} (4.5\%);
-\textbf{furniture\_decor}, \textbf{housewares}, and \textbf{telephony} also sit above 3\%.
+\textbf{bed_bath_table} has the highest quality-issue rate at \textbf{5.2\%}, followed by
+\textbf{luggage_accessories} (4.8\%) and \textbf{office_furniture} (4.5\%);
+\textbf{furniture_decor}, \textbf{housewares}, and \textbf{telephony} also sit above 3\%.
 
 \begin{figure}[htbp]
     \centering
@@ -520,16 +521,16 @@ rather than a single blanket policy applied to every seller regardless of what t
 \end{figure}
 
 Only about \textbf{10.5\%} of marketing-qualified leads ever convert into an active seller.
-\texttt{organic\_search} and \texttt{paid\_search} bring in the most leads by volume, but they are
-not the channels that convert best -- \texttt{paid\_search} and untracked/\texttt{unknown} referral
-sources actually convert at a higher rate, while high-volume channels like \texttt{social} and
-\texttt{email} convert well below average. Among sellers who do convert, \textbf{resellers
+\path{organic_search} and \path{paid_search} bring in the most leads by volume, but they are
+not the channels that convert best -- \path{paid_search} and untracked/\path{unknown} referral
+sources actually convert at a higher rate, while high-volume channels like \path{social} and
+\path{email} convert well below average. Among sellers who do convert, \textbf{resellers
 outnumber manufacturers roughly 2:1}.
 
 \takeaway{If the platform wants better sellers (not just more of them), the acquisition budget is
 currently weighted toward channels that bring in volume, not necessarily the channels that convert
 best or attract the kind of seller least likely to end up in the quality-issue or high-late-rate
-groups identified above. Confirming that link directly (joining converted \texttt{seller\_id}s back
+groups identified above. Confirming that link directly (joining converted \path{seller_id}s back
 to seller performance) is a natural next step not yet completed here.}
 
 \section{Closing the Loop: Sizing the Priority Segment}
@@ -621,7 +622,7 @@ expected leverage:
     \item \textbf{Targeted seller and category quality program}, not a blanket policy -- audit the
         small group of consistently high-issue-rate sellers identified in Section~4.5, and set
         category-specific packaging/description standards for bulky or fragile goods
-        (bed\_bath\_table, luggage, furniture, home goods) identified in Section~4.6.
+        (bed_bath_table, luggage, furniture, home goods) identified in Section~4.6.
     \item \textbf{Regional logistics intervention in high-late-rate, low-seller-density states}
         (AL, MA, PI), while treating SP as the operational benchmark to protect, not fix. RJ
         requires a separate, logistics/carrier-focused investigation given its adequate seller
@@ -629,8 +630,8 @@ expected leverage:
     \item \textbf{Second-order retention nudge conditioned on a clean first delivery} -- the data
         shows delivery experience is where the platform is most likely to lose a customer for
         good.
-    \item \textbf{Revisit acquisition channel mix} -- channels such as \texttt{social} and
-        \texttt{email} carry real lead volume but convert well below the funnel average;
+    \item \textbf{Revisit acquisition channel mix} -- channels such as \path{social} and
+        \path{email} carry real lead volume but convert well below the funnel average;
         reallocating spend toward better-converting channels could improve seller quality at the
         source, not just after the fact.
 \end{enumerate}
@@ -663,15 +664,15 @@ pilot), not as settled facts to act on blindly.
         delivery-delay bands in Section~4.7) are small in absolute terms and should be treated as
         directionally useful, not statistically precise.
     \item \textbf{Marketing-funnel revenue fields are largely unusable.} 95\% of converted deals in
-        the marketing-funnel table have a placeholder (originally 0, recoded to \texttt{NaN})
+        the marketing-funnel table have a placeholder (originally 0, recoded to \path{NaN})
         declared-revenue value; only 5.3\% carry a genuine figure, so revenue-based funnel
         segmentation is illustrative at best.
     \item \textbf{Category-level dilution.} Aggregating to the category level weakens the
         delivery--satisfaction correlation considerably compared to the order or seller level, so
         category-level correlations should not be used in isolation to rule delivery in or out as a
         cause within a specific category.
-    \item \textbf{Known data-quality flag.} \texttt{active\_seller\_flag} in the seller-level table
-        is uniformly \texttt{True} and should not be used for active/inactive filtering until fixed
+    \item \textbf{Known data-quality flag.} \path{active_seller_flag} in the seller-level table
+        is uniformly \path{True} and should not be used for active/inactive filtering until fixed
         upstream.
 \end{itemize}
 
@@ -712,47 +713,47 @@ controlled and publicly available on GitHub:
 
 \noindent The repository includes:
 \begin{itemize}[leftmargin=2em]
-    \item All data-cleaning notebooks (\texttt{data\_cleaning/})
-    \item All exploratory-analysis notebooks (\texttt{EDA/}, \texttt{data-visualization/})
-    \item The combined explanatory narrative notebook, \texttt{combined\_eda.ipynb}, from which
+    \item All data-cleaning notebooks (\path{data_cleaning/})
+    \item All exploratory-analysis notebooks (\path{EDA/}, \path{data-visualization/})
+    \item The combined explanatory narrative notebook, \path{combined_eda.ipynb}, from which
         this report's Chapter~4 is drawn
-    \item An interactive Plotly Dash dashboard (\texttt{dashboard/app.py}) for exploring the
+    \item An interactive Plotly Dash dashboard (\path{dashboard/app.py}) for exploring the
         cleaned tables visually
-    \item The per-table question-and-answer reference documents (\texttt{questions\_ans\_by\_table/})
-    \item \texttt{requirements.txt} for reproducing the Python environment
+    \item The per-table question-and-answer reference documents (\path{questions_ans_by_table/})
+    \item \path{requirements.txt} for reproducing the Python environment
 \end{itemize}
 
 \section{Key Files Referenced in This Report}
 \begin{itemize}[leftmargin=2em]
-    \item \textbf{Narrative source:} \texttt{combined\_eda.ipynb}
+    \item \textbf{Narrative source:} \path{combined_eda.ipynb}
     \item \textbf{Cleaning notebooks:}
-        \texttt{data\_cleaning/cleaning\_master\_order\_table.ipynb},
-        \texttt{data\_cleaning/clean\_seller\_master\_table.ipynb},
-        \texttt{data\_cleaning/clean\_category\_master\_table.ipynb},
-        \texttt{data\_cleaning/clean\_marketing\_funnel\_table.ipynb}
+        \path{data_cleaning/cleaning_master_order_table.ipynb},
+        \path{data_cleaning/clean_seller_master_table.ipynb},
+        \path{data_cleaning/clean_category_master_table.ipynb},
+        \path{data_cleaning/clean_marketing_funnel_table.ipynb}
     \item \textbf{EDA notebooks:}
-        \texttt{EDA/eda\_orders.ipynb}, \texttt{EDA/eda\_master\_orders\_table.ipynb},
-        \texttt{EDA/eda\_seller\_master\_table.ipynb},
-        \texttt{EDA/marketing-funnel-analysis.ipynb},
-        \texttt{EDA/review\_message\_analysis.ipynb},
-        \texttt{data-visualization/customer-master-analysis.ipynb},
-        \texttt{data-visualization/seller\_product\_analysis.ipynb}
+        \path{EDA/eda_orders.ipynb}, \path{EDA/eda_master_orders_table.ipynb},
+        \path{EDA/eda_seller_master_table.ipynb},
+        \path{EDA/marketing-funnel-analysis.ipynb},
+        \path{EDA/review_message_analysis.ipynb},
+        \path{data-visualization/customer-master-analysis.ipynb},
+        \path{data-visualization/seller_product_analysis.ipynb}
     \item \textbf{Per-table Q\&A reference documents:}
-        \texttt{questions\_ans\_by\_table/orders\_table1.md},
-        \texttt{questions\_ans\_by\_table/orders\_table2\_questions.md},
-        \texttt{questions\_ans\_by\_table/seller\_table\_questions.md},
-        \texttt{questions\_ans\_by\_table/customer\_table\_questions.md},
-        \texttt{questions\_ans\_by\_table/category\_table\_questions.md},
-        \texttt{questions\_ans\_by\_table/marketing\_funnel\_table\_questions.md}
-    \item \textbf{Interactive dashboard:} \texttt{dashboard/app.py} (see
-        \texttt{dashboard/README.md} for run instructions)
+        \path{questions_ans_by_table/orders_table1.md},
+        \path{questions_ans_by_table/orders_table2_questions.md},
+        \path{questions_ans_by_table/seller_table_questions.md},
+        \path{questions_ans_by_table/customer_table_questions.md},
+        \path{questions_ans_by_table/category_table_questions.md},
+        \path{questions_ans_by_table/marketing_funnel_table_questions.md}
+    \item \textbf{Interactive dashboard:} \path{dashboard/app.py} (see
+        \path{dashboard/README.md} for run instructions)
 \end{itemize}
 
 \section{Reproducing This Report}
 The figures embedded in this report were extracted directly from the executed outputs of
-\texttt{combined\_eda.ipynb}. To reproduce them: clone the repository above, install dependencies
-from \texttt{requirements.txt}, and execute \texttt{combined\_eda.ipynb} end to end (e.g.\ via
-\texttt{jupyter nbconvert --to notebook --execute --inplace combined\_eda.ipynb}); all figures and
+\path{combined_eda.ipynb}. To reproduce them: clone the repository above, install dependencies
+from \path{requirements.txt}, and execute \path{combined_eda.ipynb} end to end (e.g.\ via
+\path{jupyter nbconvert --to notebook --execute --inplace combined_eda.ipynb}); all figures and
 printed numbers in this report will regenerate identically from the current data.
 
 \end{document}
